@@ -8,11 +8,18 @@
 import urllib.request
 import time
 import re
+import socket
 from bs4 import BeautifulSoup
+from bs4 import UnicodeDammit
+
+from .header import headerObj
 
 
 class HtmlSpider:
 
+    # 设置超时时间
+    intTimeout = 10
+    socket.setdefaulttimeout(intTimeout)
 
     def getHtmlHttpReponse(self, strUrl):
 
@@ -27,7 +34,9 @@ class HtmlSpider:
 
         httpResponseData = None
         try:
-            httpResponseData = urllib.request.urlopen(strUrl)
+            reqObj = urllib.request.Request(strUrl, headers=headerObj)
+            httpResponseData = urllib.request.urlopen(reqObj)
+
         except Exception as error:
             print('请求出错[error=' + str(error) + ']--耗时: ' +
                                       str(round(time.time() - intIndexTime, 4)) + 's')
@@ -75,7 +84,53 @@ class HtmlSpider:
 
         intIndexRequestTime = time.time()
         try:
-            httpResponseData = openerDirectorObj.open(strUrl)
+            reqObj = urllib.request.Request(strUrl, headers=headerObj)
+            httpResponseData = openerDirectorObj.open(reqObj)
+
+        except Exception as error:
+
+            print('请求出错[error=' + str(error) + ']--耗时: ' +
+                  str(round(time.time() - intIndexRequestTime, 4)) + 's')
+
+        else:
+
+            intCode = httpResponseData.getcode()
+
+            print(str(httpResponseData.info()))
+            print('response url:[' + httpResponseData.geturl() + ']')
+
+            if intCode == 200:
+                print('请求成功---耗时: ' + str(round(time.time() - intIndexRequestTime, 4)) + 's')
+            else:
+                httpResponseData = None
+                print('请求出错[code=' + str(intCode) + ']--耗时: ' +
+                      str(round(time.time() - intIndexRequestTime, 4)) + 's')
+
+        return httpResponseData
+
+
+    def getProxyHtmlHttpReponseUseSet(self, strUrl, strProxyHost, strProxyType):
+
+        '''
+        describe: 请求url, 获取响应内容, 使用代理方式
+        :param strUrl: 需要请求的url
+        :param strProxyHost: 代理服务器ip和端口port, 格式: ip:port
+        :param strProxyType: 代理服务器协议类型, https/http
+        :return: 返回一个httpResponse类型的数据, 请求出错返回None
+        '''
+
+        httpResponseData = None
+
+        print('正在请求页面[' + strUrl + ']')
+
+        print('正在连接代理服务器[host=' + strProxyHost + ', type=' + strProxyType + ']')
+
+        intIndexRequestTime = time.time()
+        try:
+            reqObj = urllib.request.Request(strUrl, headers=headerObj)
+            reqObj.set_proxy(strProxyHost, strProxyType)
+            httpResponseData = urllib.request.urlopen(reqObj)
+
         except Exception as error:
 
             print('请求出错[error=' + str(error) + ']--耗时: ' +
@@ -160,7 +215,9 @@ class HtmlSpider:
             if strCoding is not None:
                 pass
             else:
-                strCoding = self.getHtmlEncode(bytesData)
+                # strCoding = self.getHtmlEncode(bytesData)
+                strCoding = self.getPageEncode(bytesData)
+
                 if strCoding is None:
                     print('未获取到页面编码, 执行默认设置为utf-8')
                     strCoding = 'utf-8'
@@ -172,7 +229,30 @@ class HtmlSpider:
         # print(httpResponseData.closed)
         return strHtml
 
-    def getProxyHtmlStrMsg(self, strUrl, proxyMsgObj):
+    def getHtmlStrMsgNew(self, strUrl):
+
+        '''
+        describe: 根据url来获取页面的源代码内容, 这里通过使用UnicodeDammit这个模块来获取页面编码及内容
+        :param strUrl: 需要获取的页面的url
+        :return: 返回页面数据, 为str类型, 如果请求出错, 则页面数据返回None
+        '''
+
+        httpResponseData = self.getHtmlHttpReponse(strUrl)
+
+        if httpResponseData is not None:
+
+            bytesData = httpResponseData.read()
+
+            udObj = UnicodeDammit(bytesData)
+            strHtml = udObj.unicode_markup
+
+            httpResponseData.close()
+        else:
+            strHtml = None
+        # print(httpResponseData.closed)
+        return strHtml
+
+    def getProxyHtmlStrMsg(self, strUrl, strProxyHost, strProxyType):
 
         '''
         describe: 根据url来获取页面的源代码内容, 已按页面编码来解码, 如为获取到页面编码, 则默认使用utf-8编码. 使用代理方式
@@ -181,7 +261,7 @@ class HtmlSpider:
         :return: 返回页面数据, 为str类型, 如果请求出错, 则页面数据返回None
         '''
 
-        httpResponseData = self.getProxyHtmlHttpReponse(strUrl, proxyMsgObj)
+        httpResponseData = self.getProxyHtmlHttpReponseUseSet(strUrl, strProxyHost, strProxyType)
 
         if httpResponseData is not None:
             strCoding = httpResponseData.headers.get_content_charset()
@@ -190,7 +270,7 @@ class HtmlSpider:
             if strCoding is not None:
                 pass
             else:
-                strCoding = self.getHtmlEncode(bytesData)
+                strCoding = self.getPageEncode(bytesData)
                 if strCoding is None:
                     print('未获取到页面编码, 执行默认设置为utf-8')
                     strCoding = 'utf-8'
@@ -200,6 +280,32 @@ class HtmlSpider:
         else:
             strHtml = None
         return strHtml
+
+
+    def getProxyHtmlStrMsgNew(self, strUrl, strProxyHost, strProxyType):
+
+        '''
+        describe: 根据url来获取页面的源代码内容, 这里通过使用UnicodeDammit这个模块来获取页面编码及内容
+        :param strUrl: 需要获取的页面的url
+        :param proxyMsgObj: 代理服务器信息
+        :return: 返回页面数据, 为str类型, 如果请求出错, 则页面数据返回None
+        '''
+
+        httpResponseData = self.getProxyHtmlHttpReponseUseSet(strUrl, strProxyHost, strProxyType)
+
+        if httpResponseData is not None:
+
+            bytesData = httpResponseData.read()
+
+            udObj = UnicodeDammit(bytesData)
+            strHtml = udObj.unicode_markup
+
+            httpResponseData.close()
+        else:
+            strHtml = None
+        # print(httpResponseData.closed)
+        return strHtml
+
 
 
     def getBuildUpProxyMsgObj(self, strProxyMethod, strProxyIP, intPort):
@@ -226,15 +332,13 @@ class HtmlSpider:
         '''
         describe: 获取网页的编码
         :param data: 网页内容, 可string, 可bytes
-        :return:
+        :return: 返回编码, str类型
         '''
         strEncode = None
 
         if data is not None:
 
-            beautifulObj = BeautifulSoup(data, "html.parser")
-
-            print(beautifulObj.find_all(re.compile('meta'), charset=True))
+            beautifulObj = BeautifulSoup(data, "lxml")
 
             tagLabel = beautifulObj.find('meta', charset=True)
 
@@ -245,6 +349,32 @@ class HtmlSpider:
 
         print('获取到的页面编码为: ' + str(strEncode))
         return strEncode
+
+
+    def getPageEncode(self, data):
+
+        '''
+        describe: 获取网页的编码, 这个方法比getHtmlEncode()方法成功率更高
+        :param data: 网页内容
+        :return: 返回编码, str类型
+        '''
+
+        strEncode = None
+
+        if data is not None:
+
+            print('unicodeDammit....')
+            udObj = UnicodeDammit(data)
+
+            strEncode = udObj.original_encoding
+
+            print('unicodeDammit---over')
+        else:
+            print('参数[data=None]')
+
+        print('获取到的页面编码为: ' + str(strEncode))
+        return strEncode
+
 
 
     def getDivLabelByClassValue(self, strUrl, strValue):
