@@ -8,25 +8,20 @@
 
 class StringUtil:
 
-    strSymbol = ['=', '\"', ' ', '\'']
+    _strSymbol = ['=', '\"', ' ', '\'']
 
-    def removeSymbol(self, strContent):
-
-        '''
+    def remove_symbol(self, str_content):
+        """
         describe: 从字符串中移除符号.
-        :param strContent:
+        :param str_content:
         :return:
-        '''
+        """
+        list_new_content = []
+        for strItem in list(str_content):
 
-        listNewContent = []
-        for strItem in list(strContent):
-
-            if strItem not in self.strSymbol:
-                listNewContent.append(strItem)
+            if strItem not in self._strSymbol:
+                list_new_content.append(strItem)
             else:
                 pass
-        return listNewContent
-
-
-    # def findValue(self, strContent):
+        return list_new_content
 
