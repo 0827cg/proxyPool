@@ -11,87 +11,47 @@ import socket
 from bs4 import BeautifulSoup
 from bs4.dammit import UnicodeDammit
 from .header import header_obj
+from proxyPool.bin.proxy_pool import ProxyPool
 
 
-class HtmlSpider:
+class HtmlSpider(ProxyPool):
 
     # 设置超时时间
     time_out = 10
     socket.setdefaulttimeout(time_out)
 
-    @staticmethod
-    def get_html_http_response(url):
-
+    def getresponse(self, url):
         """
         describe: 请求url, 获取响应内容
         :param url: 需要请求的url
         :return: 返回一个httpResponse类型的数据, 请求出错返回None
         """
-        print('正在请求页面[' + url + ']')
-        index_time = time.time()
-        http_response_data = None
         try:
             req_obj = urllib.request.Request(url, headers=header_obj)
             http_response_data = urllib.request.urlopen(req_obj)
+            return http_response_data
+        except BaseException as error:
+            self.log_obj.error('请求出错, url: ' + url + ' error: ' + str(error))
+            return None
 
-        except Exception as error:
-            print('请求出错[error=' + str(error) + ']--耗时: ' + str(round(time.time() - index_time, 4)) + 's')
-        else:
-            int_code = http_response_data.getcode()
-            print(str(http_response_data.info()))
-            print('response url:[' + http_response_data.geturl() + ']')
-            if int_code == 200:
-                print('请求成功---耗时: ' + str(round(time.time() - index_time, 4)) + 's')
-            else:
-                http_response_data = None
-                print('请求出错[code=' + str(int_code) + ']--耗时: ' + str(round(time.time() - index_time, 4)) + 's')
-        return http_response_data
-
-    @staticmethod
-    def get_proxy_http_response(url, proxy_msg_obj):
+    def getresponse_proxy(self, url, proxy_msg):
         """
         describe: 请求url, 获取响应内容, 使用代理方式
         :param url: 需要请求的url
-        :param proxy_msg_obj: 代理服务器信息
+        :param proxy_msg: 代理服务器信息
         :return: 返回一个httpResponse类型的数据, 请求出错返回None
         """
-        http_response_data = None
-
-        print('正在请求页面[' + url + ']')
-
-        print('正在连接代理服务器[' + str(proxy_msg_obj) + ']')
-
-        proxy_handler_obj = urllib.request.ProxyHandler(proxy_msg_obj)
-        # print(type(proxyHandlerObj))
-        # print(proxyHandlerObj)
-        # print(str(proxyHandlerObj))
-
+        proxy_handler_obj = urllib.request.ProxyHandler(proxy_msg)
         opener_director_obj = urllib.request.build_opener(proxy_handler_obj)
-        # print(type(openerDirectorObj))
-        # print(openerDirectorObj)
-        # print(str(openerDirectorObj))
-
-        index_request_time = time.time()
         try:
             req_obj = urllib.request.Request(url, headers=header_obj)
             http_response_data = opener_director_obj.open(req_obj)
+            return http_response_data
         except Exception as error:
-            print('请求出错[error=' + str(error) + ']--耗时: ' +
-                  str(round(time.time() - index_request_time, 4)) + 's')
-        else:
-            code = http_response_data.getcode()
-            print(str(http_response_data.info()))
-            print('response url:[' + http_response_data.geturl() + ']')
-            if code == 200:
-                print('请求成功---耗时: ' + str(round(time.time() - index_request_time, 4)) + 's')
-            else:
-                http_response_data = None
-                print('请求出错[code=' + str(code) + ']--耗时: ' +
-                      str(round(time.time() - index_request_time, 4)) + 's')
-        return http_response_data
+            self.log_obj.error('请求出错, url: ', url, ' proxy_msg: ', proxy_msg,  ' error: ', str(error))
+            return None
 
-    @staticmethod
-    def get_proxy_html_response_use_set(url, proxy_host, proxy_type):
+    def getresponse_proxy_msg(self, url, proxy_host, proxy_type):
 
         """
         describe: 请求url, 获取响应内容, 使用代理方式
@@ -100,28 +60,15 @@ class HtmlSpider:
         :param proxy_type: 代理服务器协议类型, https/http
         :return: 返回一个httpResponse类型的数据, 请求出错返回None
         """
-        http_response_data = None
-        print('正在请求页面[' + url + ']')
-        print('正在连接代理服务器[host=' + proxy_host + ', type=' + proxy_type + ']')
-        index_request_time = time.time()
         try:
             req_obj = urllib.request.Request(url, headers=header_obj)
             req_obj.set_proxy(proxy_host, proxy_type)
             http_response_data = urllib.request.urlopen(req_obj)
+            return http_response_data
         except Exception as error:
-            print('请求出错[error=' + str(error) + ']--耗时: ' +
-                  str(round(time.time() - index_request_time, 4)) + 's')
-        else:
-            code = http_response_data.getcode()
-            print(str(http_response_data.info()))
-            print('response url:[' + http_response_data.geturl() + ']')
-            if code == 200:
-                print('请求成功---耗时: ' + str(round(time.time() - index_request_time, 4)) + 's')
-            else:
-                http_response_data = None
-                print('请求出错[code=' + str(code) + ']--耗时: ' +
-                      str(round(time.time() - index_request_time, 4)) + 's')
-        return http_response_data
+            self.log_obj.error('请求出错, url: ', url + ' proxy_host: ', proxy_host,  ' proxy_type: ',
+                               proxy_type, ' error: ' + str(error))
+            return None
 
     def get_html_msg(self, url):
         """
@@ -129,56 +76,49 @@ class HtmlSpider:
         :param url: 需要获取的页面的url
         :return: 返回页面数据, 为bytes类型, 如果请求结果为None, 则返回页面数据为None
         """
-        http_response_data = self.get_html_http_response(url)
+        http_response_data = self.getresponse(url)
         if http_response_data is not None:
             # 读取响应体
             bytes_data = http_response_data.read()
             http_response_data.close()
         else:
-            print('请求页面结果数据为None')
             bytes_data = None
         return bytes_data
 
-    def get_proxy_html_msg(self, url, proxy_msg_obj):
+    def get_html_msg_proxy(self, url, proxy_msg_obj):
         """
         describe: 根据url获取页面数据, 使用代理方式
         :param url: 需要获取的页面的url
         :param proxy_msg_obj: 代理服务器信息
         :return: 返回页面数据, 为bytes类型, 如果请求结果为None, 则返回页面数据为None
         """
-        http_response_data = self.get_proxy_http_response(url, proxy_msg_obj)
+        http_response_data = self.getresponse_proxy(url, proxy_msg_obj)
         if http_response_data is not None:
             # 读取响应体
             bytes_data = http_response_data.read()
             http_response_data.close()
         else:
-            print('请求页面结果数据为None')
             bytes_data = None
         return bytes_data
 
-    def get_html_str_msg(self, url):
+    def get_html_msg_str(self, url):
         """
         根据url来获取页面的源代码内容, 已按页面编码来解码, 如为获取到页面编码, 则默认使用utf-8编码
         :param url: 需要获取的页面的url
         :return:  返回页面数据, 为str类型, 如果请求出错, 则页面数据返回None
         """
-        http_response_data = self.get_html_http_response(url)
+        http_response_data = self.getresponse(url)
         if http_response_data is not None:
             code = http_response_data.headers.get_content_charset()
             bytes_data = http_response_data.read()
-            if code is not None:
-                pass
-            else:
-                # code = self.getHtmlEncode(bytes_data)
+            if code is None:
                 code = self.get_page_encode(bytes_data)
                 if code is None:
-                    print('未获取到页面编码, 执行默认设置为utf-8')
                     code = 'utf-8'
             str_html = bytes_data.decode(code, 'ignore')
             http_response_data.close()
         else:
             str_html = None
-        # print(http_response_data.closed)
         return str_html
 
     def get_html_str_msg_new(self, url):
@@ -240,7 +180,6 @@ class HtmlSpider:
             http_response_data.close()
         else:
             str_html = None
-        # print(http_response_data.closed)
         return str_html
 
     @staticmethod
@@ -284,18 +223,12 @@ class HtmlSpider:
         :param data: 网页内容
         :return: 返回编码, str类型
         """
-        str_encode = None
-
         if data is not None:
-            print('unicodeDammit....')
             ud_obj = UnicodeDammit(data)
             str_encode = ud_obj.original_encoding
-            print('unicodeDammit---over')
+            return str_encode
         else:
-            print('参数[data=None]')
-
-        print('获取到的页面编码为: ' + str(str_encode))
-        return str_encode
+            return None
 
     def get_div_label_by_class_value(self, url, value):
         """
